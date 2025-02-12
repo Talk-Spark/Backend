@@ -134,8 +134,6 @@ public class SparkUserServiceImpl implements SparkUserService {
         sparkUserRepository.findById(sparkUserId)
                         .orElseThrow(()-> new CustomTalkSparkException(ErrorCode.USER_NOT_EXIST));
 
-
-
         sparkUserRepository.deleteById(sparkUserId);
 
         return sparkUserId;

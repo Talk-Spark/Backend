@@ -37,10 +37,15 @@ import java.util.concurrent.TimeUnit;
 public class RoomService {
 
     private final SparkUserRepository sparkUserRepository;
+
     private final RoomRepository roomRepository;
+
     private final RoomParticipateRepository roomParticipateRepository;
+
     private final RedissonClient redissonClient;
+
     private final StringRedisTemplate redisTemplate;
+    
     private final SecurityUtil securityUtil;
     private final RoomState roomState;
 

@@ -104,7 +104,7 @@ public interface CardControllerDocs {
     @ApiErrorCodes({ErrorCode.CARD_NOT_EXIST, ErrorCode.JWT_TOKEN_EXPIRED,ErrorCode.TOKEN_REQUIRED, ErrorCode.INVALID_JWT_TOKEN})
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "명함 조회 성공",
-            content = @Content(mediaType = "applicaiton/json",
+            content = @Content(mediaType = "application/json",
                     schema = @Schema(implementation = ResponseDTO.class),
                     examples = {
                     @ExampleObject(

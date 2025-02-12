@@ -41,7 +41,7 @@ public interface SparkUserControllerDocs {
                     }
                     """)))
 
-    Map<String, Object> refresh(String refreshToken);
+    Map<String, String> refresh(String refreshToken);
 
     @Operation(summary = "회원 탈퇴", description = "AccessToken을 이용해 회원 특정 후 회원 정보를 삭제하는 API")
     @ApiErrorCodes({ErrorCode.JWT_TOKEN_EXPIRED, ErrorCode.TOKEN_REQUIRED, ErrorCode.INVALID_JWT_TOKEN})

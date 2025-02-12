@@ -64,20 +64,17 @@ public class GameService {
                 .map(SparkUser::getCards)
                 .map(cardList -> cardList.get(0)) // 갖고 있는 카드들 중 각각 가장 첫번째 카드 선택
                 .toList(); // 참가자들의 명함 한장씩을 선택함
+        List<Card> playerCards = getPlayerCards(room); // 참가자들의 명함 한장씩을 선택함
 
-        List<UserCardQuestions> questions = questionGenerator.execute(selectedCards, room.getDifficulty()); // 선택된 명함들을 가지고 난이도를 기반으로 문제 만들기
+        List<UserCardQuestions> questions = questionGenerator.execute(playerCards, room.getDifficulty()); // 선택된 명함들을 가지고 난이도를 기반으로 문제 만들기
 
-        GameState gameState = new GameState(selectedCards, questions, room.getRoomParticipates().size()); // 게임 상태를 초기화
+        GameState gameState = new GameState(playerCards, questions); // 게임 상태를 초기화
         gameStates.put(roomId, gameState); // 특정 방 번호에 게임 상태 할당
 
 
 
         // 각 참가자들마다의 빈칸정보를 만들기
-        for (UserCardQuestions ucq : questions) {
-            Long sparkUserId = ucq.getSparkUserId();
-            List<String> blanks = ucq.getQuestions().stream().map(CardQuestion::getFieldName).toList();
-            gameStates.get(roomId).getCardBlanksDtos().add(CardBlanksDto.of(sparkUserId, blanks));
-        }
+        createBlanks(roomId, questions);
     }
 
     public CardQuestion getQuestion(Long roomId) {
@@ -102,7 +99,7 @@ public class GameService {
 
     public boolean allPeopleSubmitted(Long roomId) {
         GameState gameState = gameStates.get(roomId);
-        return gameState.getCurrentQuestionAnswerNum().equals(gameState.getRoomPeople());
+        return gameState.getCurrentQuestionAnswerNum().equals(gameState.getPlayerInfo().size());
     }
 
     public List<CorrectAnswerDto> getSingleQuestionScoreBoard(Long roomId) {
@@ -127,33 +124,32 @@ public class GameService {
 
     public List<CardResponseCustomDTO> getAllRelatedCards(Long roomId) {
         GameState gameState = gameStates.get(roomId);
-        return gameState.getCards().stream().map(CardResponseCustomDTO::fromCard).toList();
+        return gameState.getPlayerInfo().values().stream().map(CardResponseCustomDTO::fromCard).toList();
     }
 
     @Transactional
     public void insertCardCopies(Long roomId, Long sparkUserId) {
         GameState gameState = gameStates.get(roomId);
+        Map<Long, Card> playerInfo = gameState.getPlayerInfo();
         Room room = roomRepository.findById(roomId).orElseThrow();
-        List<Long> participantIds = gameState.getParticipantIds();// 참가자들 아이디
-        List<Card> cards = gameState.getCards(); // 참가됐던 카드들
+        List<Long> participantIds = playerInfo.keySet().stream().toList();
         List<Long> addingCardIds = new ArrayList<>();
+        List<Card> cards = playerInfo.values().stream().toList();
 
-        // 명함 보관함 있는 브랜치랑 병합 후 작업
+
         for (Long participantId : participantIds) {
             for (Card c : cards) {
                 if (!c.getSparkUser().getId().equals(participantId)) addingCardIds.add(c.getId());
             }
         }
+
+//        List<Card> cardsToStore = playerInfo.entrySet()
+//                .stream()
+//                .filter(entry -> !entry.getKey().equals(sparkUserId))
+//                .map(Map.Entry::getValue)
+//                .toList();
+//
         storedCardService.storeTeamCard(TeamCardHolderCreateDTO.of(sparkUserId, room.getRoomName(), addingCardIds));
-    }
-
-    public String explainStatus(Long roomId) {
-        GameState gameState = gameStates.get(roomId);
-        List<CorrectAnswerDto> currentQuestionCorrect = gameState.getCurrentQuestionCorrect();
-        Map<Long, Integer> scores = gameState.getScores();
-        List<CardQuestion> questions = gameState.getQuestions();
-
-        return currentQuestionCorrect.toString() + "\n" + scores.toString() + "\n" + questions.toString();
     }
 
     public void updateBlanks(Long roomId) {
@@ -163,5 +159,25 @@ public class GameService {
         gameState.getCardBlanksDtos().stream()
                 .filter(cbd -> cbd.getSparkUserId().equals(cardOwnerId)).findFirst()
                 .ifPresent(cbd -> cbd.getBlanks().remove(fieldName));
+    }
+
+    private List<Card> getPlayerCards(Room room) {
+        return room.getRoomParticipates().stream()
+                .map(RoomParticipate::getSparkUser)
+                .map(SparkUser::getCards)
+                .map(cardList -> cardList.get(0)) // 갖고 있는 카드들 중 각각 가장 첫번째 카드 선택
+                .toList();
+    }
+
+    private void createBlanks(Long roomId, List<UserCardQuestions> questions) {
+        for (UserCardQuestions ucq : questions) {
+            Long sparkUserId = ucq.getSparkUserId();
+            List<String> blanks = ucq.getQuestions().stream().map(CardQuestion::getFieldName).toList();
+            gameStates.get(roomId).getCardBlanksDtos().add(CardBlanksDto.of(sparkUserId, blanks));
+        }
+    }
+
+    public void endGame(Long roomId) {
+        gameStates.remove(roomId);
     }
 }

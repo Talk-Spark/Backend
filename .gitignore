@@ -48,3 +48,4 @@ out/
 **/._.DS_Store
 
 /src/test/java/mutsa/yewon/talksparkbe/domain/game/service/**
+/src/test/java/mutsa/yewon/talksparkbe/domain/sparkUser/service/**

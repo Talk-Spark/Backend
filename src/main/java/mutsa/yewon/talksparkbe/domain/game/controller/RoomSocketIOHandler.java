@@ -102,12 +102,10 @@ public class RoomSocketIOHandler {
 
         server.addEventListener("startGame", RoomJoinRequest.class, (client, data, ackSender) -> {
             try {
-                System.out.println("startGame 받음. " + data.toString());
                 Long roomId = data.getRoomId();
                 roomService.changeStarted(roomId);
                 server.getRoomOperations(roomId.toString()).sendEvent("startGame", "게임이 시작됩니다.");
             } catch (Exception e) {
-                System.err.println("게임 시작 오류: " + e.getMessage());
                 client.sendEvent("startGameError", "게임 시작 중 오류가 발생했습니다.");
             }
         });
@@ -119,7 +117,6 @@ public class RoomSocketIOHandler {
     @Transactional
     public void startGameListeners() {
         server.addEventListener("joinGame", RoomJoinRequest.class, (client, data, ackSender) -> {
-            System.out.println("joinGame 받음. " + data.toString());
             server.getClient(client.getSessionId()).joinRoom(data.getRoomId().toString());
 
             String token = data.getAccessToken();
@@ -132,17 +129,14 @@ public class RoomSocketIOHandler {
         });
 
         server.addEventListener("prepareQuizzes", GameStartRequest.class, (client, data, ackSender) -> {
-            System.out.println("prepareQuizzes 받음. " + data.toString());
             gameService.startGame(data.getRoomId());
         });
 
         server.addEventListener("getQuestion", QuestionRequest.class, (client, data, ackSender) -> {
-            System.out.println("getQuestion 받음. " + data.toString());
             broadcastQuestion(data.getRoomId());
         });
 
         server.addEventListener("submitSelection", AnswerSubmitRequest.class, (client, data, ackSender) -> {
-            System.out.println("submitSelection 받음. " + data.toString());
             Long roomId = data.getRoomId();
             Long sparkUserId = data.getSparkUserId();
             String answer = data.getAnswer();
@@ -152,37 +146,53 @@ public class RoomSocketIOHandler {
                 broadcastSingleQuestionResult(roomId);
                 gameService.updateBlanks(roomId);
             }
-            System.out.println(gameService.explainStatus(roomId));
         });
 
         server.addEventListener("next", QuestionRequest.class, (client, data, ackSender) -> {
 
-            System.out.println("next 받음. " + data.toString());
             Long roomId = data.getRoomId();
 
             SwitchSubject switchSubject = gameService.isSwitchingSubject(roomId);
 
-            if (switchSubject.equals(SwitchSubject.END)) {
-                server.getRoomOperations(roomId.toString()).sendEvent("lastResult",
-                        gameService.getCurrentCard(roomId));
-            } else if (switchSubject.equals(SwitchSubject.TRUE)) {
-                server.getRoomOperations(roomId.toString()).sendEvent("singleResult",
-                        gameService.getCurrentCard(roomId));
-            } else {
-                gameService.loadNextQuestion(roomId);
-                broadcastQuestion(roomId);
+            switch (switchSubject){
+                case END -> sendLastResult(roomId);
+                case TRUE -> sendSingleResult(roomId);
+                default ->  {
+                    gameService.loadNextQuestion(roomId);
+                    broadcastQuestion(roomId);
+                }
+
             }
+
+//            if (switchSubject.equals(SwitchSubject.END)) {
+//                sendLastResult(roomId);
+//            } else if (switchSubject.equals(SwitchSubject.TRUE)) {
+//                sendSingleResult(roomId);
+//            } else {
+//                gameService.loadNextQuestion(roomId);
+//                broadcastQuestion(roomId);
+//            }
         });
 
         server.addEventListener("getEnd", EndRequest.class, (client, data, ackSender) -> {
-            System.out.println("getEnd 받음. " + data.toString());
-            System.out.println("getEnd RoomId " + data.getRoomId().toString());
             Long sparkUserId = data.getSparkUserId();
-            System.out.println("Room Operations: " + server.getRoomOperations(data.getRoomId().toString()));
-            server.getRoomOperations(data.getRoomId().toString()).sendEvent("scores", gameService.getScores(data.getRoomId()), gameService.getAllRelatedCards(data.getRoomId()));
-            gameService.insertCardCopies(data.getRoomId(), sparkUserId);
-            roomService.changeFinished(data.getRoomId());
+            Long roomId = data.getRoomId();
+
+            server.getRoomOperations(roomId.toString()).sendEvent("scores", gameService.getScores(roomId), gameService.getAllRelatedCards(roomId));
+            gameService.insertCardCopies(roomId, sparkUserId);
+            gameService.endGame(roomId); // 게임 종료 시 저장하고 있던 게임 정보는 삭제
+            roomService.changeFinished(roomId);
         });
+    }
+
+    private void sendSingleResult(Long roomId) {
+        server.getRoomOperations(roomId.toString()).sendEvent("singleResult",
+                gameService.getCurrentCard(roomId));
+    }
+
+    private void sendLastResult(Long roomId) {
+        server.getRoomOperations(roomId.toString()).sendEvent("lastResult",
+                gameService.getCurrentCard(roomId));
     }
 
     // 질문 브로드캐스트 메서드
@@ -196,12 +206,7 @@ public class RoomSocketIOHandler {
     @Transactional(readOnly = true)
     public void broadcastSingleQuestionResult(Long roomId) {
         List<CorrectAnswerDto> singleQuestionScoreBoard = gameService.getSingleQuestionScoreBoard(roomId);
-//        singleQuestionScoreBoard
-//                .forEach(it -> {
-//                    List<Card> cardList = cardRepository.findBySparkUserId(it.getSparkUserId());
-//                    it.setName(cardList.get(0).getName());
-//                    it.setColor(cardList.get(0).getCardThema());
-//                });
+
         if (!singleQuestionScoreBoard.isEmpty())
             server.getRoomOperations(roomId.toString()).sendEvent("singleQuestionScoreBoard", singleQuestionScoreBoard);
     }

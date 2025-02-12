@@ -68,7 +68,7 @@ public class GameTestController {
 
         List<UserCardQuestions> questions = questionGenerator.execute(List.of(card1, card2), 2);
 
-        GameState gameState = new GameState(List.of(card1, card2), questions, 2); // 게임 상태를 초기화
+        GameState gameState = new GameState(List.of(card1, card2), questions); // 게임 상태를 초기화
         gameStates.put(1L, gameState); // 특정 방 번호에 게임 상태 할당
 
         // 각 참가자들마다의 빈칸정보를 만들기

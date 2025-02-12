@@ -14,9 +14,9 @@ import java.util.*;
 public class QuestionGenerator {
 
     public List<UserCardQuestions> execute(List<Card> cards, int difficulty) {
-        int numOfQuestions = 0;
-        if (difficulty <= 2) numOfQuestions = difficulty + 1;
-        else if (difficulty == 3) numOfQuestions = 5;
+        int maxNumOfQuestions = 0;
+        if (difficulty <= 2) maxNumOfQuestions = difficulty + 1;
+        else if (difficulty == 3) maxNumOfQuestions = 5;
         List<UserCardQuestions> userCardQuestionsList = new ArrayList<>();
 
         // 빈칸 필드를 생성할 키 리스트 (명함의 필드명)
@@ -31,13 +31,13 @@ public class QuestionGenerator {
         // 각 필드마다, 이 필드를 채워놓은 놈이 사람수만큼은 되어야 문제로 출제 가능
         for (DummyOption k : keys) {
 
-            Set<String> options = new HashSet<>();
+            Set<String> options = new HashSet<>(); // 보기로 만들 후보들
 
             for (Card c : cards){
 
                 log.info("현재 명함" + c);
 
-                String fieldValue = getFieldValue(c, k.getOption());
+                String fieldValue = getFieldValue(c, k.getOption()); // 각 명함별로 해당 필드의 항목 추출
 
                 log.info("명함 항목" + fieldValue);
 
@@ -70,33 +70,27 @@ public class QuestionGenerator {
 
         }
 
-        for (Card c : cards) {
+        for (Card c : cards) { // 각 명함별로
             List<String> fields = new ArrayList<>(List.of("mbti", "hobby", "lookAlike", "selfDescription", "tmi"));
-            List<CardQuestion> questions = new ArrayList<>();
-
-
-            /*
-                인원 수가 4명 이하인 경우
-            */
+            List<CardQuestion> questions = new ArrayList<>(); // 문제들을 담을 리스트
 
             if(numOfPeople <= 4){
-                fields.removeIf(field -> fieldCount.get(field) < numOfPeople);
+                fields.removeIf(field -> getFieldValue(c, field) == null || fieldCount.get(field) < numOfPeople); // 인원수가 4명이하인 경우, 답안을 제출한 인원 수가 현재 인원 수보다 작으면 문제 출제 불가
             }
             else{
                 fields.removeIf(field -> getFieldValue(c, field) == null || fieldCount.get(field) < 4);
             }
-            System.out.println("fields = " + fields);
+
             Collections.shuffle(fields);
-            System.out.println("fields = " + fields);
+
+            int numOfQuestions = Math.min(maxNumOfQuestions, fields.size()); // 출제가능한 문제 수는 문제 항목의 수!
 
             for (int i=0;i<numOfQuestions;i++) {
                 questions.add(generateQuestion(c, fields.get(i), listOfOptions.get(fields.get(i)), numOfPeople));
             }
-            System.out.println("generateQuestion이 끝남");
 
             userCardQuestionsList.add(new UserCardQuestions(c.getSparkUser().getId(), questions)); // 어떤 사람의 카드에 대한 질문들 생성 완료
         }
-        System.out.println("모든 for문 끝");
 
         userCardQuestionsList.sort(Comparator.comparing(UserCardQuestions::getSparkUserId)); // 유저아이디 오름차순. 그래서 같은 유저아이디의 문제가 쫙 나옴.
 
@@ -108,7 +102,6 @@ public class QuestionGenerator {
     private CardQuestion generateQuestion(Card c, String fieldName, Set<String> cardData, int numOfPeople) {
         String correctAnswer = getFieldValue(c, fieldName);
         List<String> options = generateOptions(correctAnswer, cardData, numOfPeople);
-        System.out.println("generateOptions 끝남");
         return new CardQuestion(c.getId(), c.getSparkUser().getId(), fieldName, correctAnswer, options);
     }
 
@@ -141,13 +134,9 @@ public class QuestionGenerator {
 
         List<String> canBeOptions = new ArrayList<>(cardData);
 
-
-
         canBeOptions.remove(correctAnswer);
 
-        List<String> options = getOptionsByCombi(canBeOptions, 3);
-
-
+        List<String> options = new ArrayList<>(getOptionsByCombi(canBeOptions));
 
         options.add(correctAnswer);
         Collections.shuffle(options); // 보기 순서 섞기
@@ -155,16 +144,13 @@ public class QuestionGenerator {
         return options;
     }
 
-    private List<String> getOptionsByCombi(List<String> candidates, int count){
-        if (count > candidates.size()) {
-            throw new RuntimeException("요청된 갯수는 Set의 크기보다 클 수 없습니다.");
-        }
+    private Set<String> getOptionsByCombi(List<String> candidates){
 
-        List<String> options = new ArrayList<>();
+        Set<String> options = new HashSet<>();
 
         Random random = new Random();
 
-        while(options.size() < count){
+        while(options.size() < 3){
             int index = random.nextInt(candidates.size());
 
             options.add(candidates.get(index));
@@ -172,5 +158,7 @@ public class QuestionGenerator {
 
         return options;
     }
+
+
 
 }
